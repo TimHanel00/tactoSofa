@@ -28,6 +28,7 @@ def main(cfg):
     p.resetDebugVisualizerCamera(**cfg.pybullet_camera)
 
     # Create and initialize DIGIT
+
     digit_body = px.Body(**cfg.digit)
     digits.add_camera(digit_body.id, [-1])
 

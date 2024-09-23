@@ -1,0 +1,6 @@
+[submodule "vascu_synth"]
+	path = vascu_synth
+	url = https://github.com/sziem/vascu_synth.git
+[submodule "STLIB"]
+	path = STLIB
+	url = https://github.com/SofaDefrost/STLIB.git

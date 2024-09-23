@@ -11,6 +11,7 @@ from .sensor import (  # noqa: F401; noqa: F401
     get_digit_shadow_config_path,
     get_omnitact_config_path,
 )
+from .sofa_addon import *
 
 __author__ = "Wang, Shaoxiong and Lambeta, Mike and Chou, Po-Wei and Calandra, Roberto"
 __contact__ = "sxwang@fb.com, lambetam@fb.com, poweic@fb.com, rcalandra@fb.com"

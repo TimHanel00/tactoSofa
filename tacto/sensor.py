@@ -14,9 +14,10 @@ import numpy as np
 import pybullet as p
 import trimesh
 from urdfpy import URDF
-
+import pyrender
+import pybulletX as px
 from .renderer import Renderer
-
+from typing import List
 logger = logging.getLogger(__name__)
 
 
@@ -35,27 +36,160 @@ def get_digit_shadow_config_path():
 def get_omnitact_config_path():
     return _get_default_config("config_omnitact.yml")
 
+def swap(l1,i,l2,j):
+    tmp=l1[i]
+    l1[i]=l2[j]
+    l2[j]=tmp
+def degtoRad(angle):
+    import math
+    return angle*math.pi/180
+def register(linkobj,dataReceive):
+    if linkobj.sofaName=="":
+            for obj in dataReceive.get().tolist():
+                if obj.name=="Tissue" and linkobj.obj_id==2:
+                    linkobj.sofaName=obj.name
+                if obj.name=="Sensor" and linkobj.link_id==-1 and linkobj.obj_id==1:
+                    linkobj.sofaName=obj.name
+def getSofaName(linkobj):
+    if linkobj.link_id==-1 and linkobj.obj_id==1:
+        return "Sensor"
+    if linkobj.obj_id==2:
+        return "Tissue"
+    return ""
+def tissueHandle(link,sofaObject):
+    pos=sofaObject.position
+    orient=[degtoRad(i) for i in sofaObject.orientation]
+    link.mesh=sofaObject.mesh
+    if link.mesh is not None:
+        #print("updatingMesh")
+        
+        
+        #print(self.mesh)
+        vertices = link.mesh.vertices.tolist()  # Convert to list
+        indices = link.mesh.faces.flatten().tolist()     # Convert to list
+        #print(vertices)
+        #print(indices)
+        new_visual_shape = p.createVisualShape(
+            shapeType=p.GEOM_MESH, 
+            vertices=vertices, 
+            indices=indices
+        )
+        new_collision_shape = p.createCollisionShape(shapeType=p.GEOM_MESH, vertices=vertices, 
+            indices=indices)
+        old_id=link.pybullet_id
 
+        link.pybullet_id = p.createMultiBody(basePosition=pos,baseOrientation=orient,baseVisualShapeIndex=new_visual_shape, baseCollisionShapeIndex=new_collision_shape)
+        from time import sleep
+        sleep(0.01)
+        p.removeBody(old_id)
+    
+    if link.force is not None:
+        link.force=sofaObject.forces
+        p.resetBasePositionAndOrientation(link.obj_id, pos, p.getQuaternionFromEuler(orient))
+                
+    return pos,orient 
+def sensorHandle(link,sofaObject,pos,orient):
+    link.force=sofaObject.forces
+    if link.force>10.0:
+        print(link.force)
+    p.resetBasePositionAndOrientation(link.obj_id, pos, p.getQuaternionFromEuler(orient))
+    return pos,orient
+def default(link,sofaObject,pos,orient):
+    return pos,orient
+costumFctDict={"Sensor":sensorHandle,"Tissue":tissueHandle,"":default}
 @dataclass
 class Link:
-    obj_id: int  # pybullet ID
+    obj_id: int  # ID used for Tacto (pyrender and initially pybullet)
     link_id: int  # pybullet link ID (-1 means base)
     cid: int  # physicsClientId
+    name:str
+    internalPos=None
+    internalRot=None
+    initSofaPos=None
+    force=None
+    mesh=None
+    sofaName=""
+    pybullet_id: int #ID used explicitly for pybullet
+    def __init__(self,obj_id,link_id,cid):
+        self.obj_id=obj_id
+        self.link_id=link_id
+        self.cid=cid
+        self.pybullet_id=self.obj_id
+        self.name="{}_{}".format(obj_id, link_id)
 
-    def get_pose(self):
+    def get_pose(self,dataReceive=None):
+        global costumFctDict
+        
+        #for k,v in dic:
+            #print(v)
+        p.setRealTimeSimulation(0)
         if self.link_id < 0:
             # get the base pose if link ID < 0
             position, orientation = p.getBasePositionAndOrientation(
-                self.obj_id, physicsClientId=self.cid
+                self.pybullet_id, physicsClientId=self.cid
             )
         else:
             # get the link pose if link ID >= 0
             position, orientation = p.getLinkState(
-                self.obj_id, self.link_id, physicsClientId=self.cid
+                self.pybullet_id, self.link_id, physicsClientId=self.cid
             )[:2]
 
         orientation = p.getEulerFromQuaternion(orientation, physicsClientId=self.cid)
-        return position, orientation
+        if self.internalPos==None and self.internalRot==None:
+            self.internalPos=position
+            self.internalRot=orientation
+        #print(f'{self.link_id}+ obj Id: {self.obj_id}')
+        """
+        if( is digit sensor):
+        
+        
+        print(dataReceive.latest_data)
+        for i in range(3):
+            dataReceive.latest_data.position[i]*=10
+        """    
+        #print(dataReceive.get())
+        #print(position,orientation)
+        #return dataReceive.get().position,dataReceive.get().orientation
+        #print(str(position)+ " 1")
+        pos=None
+        orient=None
+        
+        if dataReceive==None:
+            #print("receiveNone")
+            return position, orientation
+        if dataReceive.latest_data is None:
+            #print("receiveDataNone")
+            return position, orientation
+        if self.name not in dataReceive.latest_data.getDict():
+            #print("name not in dict")
+            return position, orientation
+
+        obj =dataReceive.latest_data.getDict()[self.name]
+        pos,orient=tissueHandle(self,obj)       
+        return pos,orient
+class setupObject:
+    def __init__(self,**params):
+        self.params=params
+class setupCamera:
+    def __init__(self,linkIds,**params):
+        self.params=params
+        self.linkIds=linkIds
+class Setup:
+    setup_camera: setupCamera
+    setup_objects: List[setupObject]
+    reset_params = None
+
+    def __init__(self):
+        self.setup_objects = []
+
+    def resetDebugVisualizerCamera(self, **params):
+        self.reset_params = params
+
+    def add_camera(self, linkIds, **params):
+        self.setup_camera = setupCamera(linkIds, **params)
+
+    def add_object(self, **params):
+        self.setup_objects.append(setupObject(**params))
 
 
 class Sensor:
@@ -69,6 +203,7 @@ class Sensor:
         show_depth=True,
         zrange=0.002,
         cid=0,
+        dataReceive=None
     ):
         """
 
@@ -80,13 +215,19 @@ class Sensor:
         :param config_path:
         :param cid: Int
         """
+        self.setup=Setup()
+        self.scene_objects={}
+        self.sensor_objects=[]
         self.cid = cid
-        self.renderer = Renderer(width, height, background, config_path)
-
+        self.renderer=None
+        self._width=width
+        self._height=height
+        self._background=background
+        self.config_path=config_path
         self.visualize_gui = visualize_gui
         self.show_depth = show_depth
         self.zrange = zrange
-
+        self.dataReceiver=dataReceive
         self.cameras = {}
         self.nb_cam = 0
         self.objects = {}
@@ -96,17 +237,18 @@ class Sensor:
 
     @property
     def height(self):
-        return self.renderer.height
+        return self._height
 
     @property
     def width(self):
-        return self.renderer.width
+        return self._width
 
     @property
     def background(self):
-        return self.renderer.background
-
-    def add_camera(self, obj_id, link_ids):
+        return self._background
+    def setDataReceiver(self,receiver):
+        self.dataReceiver=receiver
+    def add_camera(self, link_ids,**params):
         """
         Add camera into tacto
 
@@ -116,18 +258,30 @@ class Sensor:
             ...
         }
         """
+        self.setup.add_camera(link_ids,**params)
+    def init_renderer(self):
+        self.renderer=Renderer(self._width, self._height, self._background, self.config_path)
+    def init_camera(self):
+        pxBody=px.Body(**self.setup.setup_camera.params)
+        link_ids=self.setup.setup_camera.linkIds
+        urdf=URDF.load(pxBody.urdf_path)
+        logger.info(pxBody.urdf_path)
+        obj_id=pxBody.id
+        
+        
         if not isinstance(link_ids, collections.abc.Sequence):
             link_ids = [link_ids]
 
         for link_id in link_ids:
             cam_name = "cam" + str(self.nb_cam)
+            obj_name = "{}_{}".format(obj_id, link_id)
+            self.sensor_objects.append((cam_name,obj_name,urdf))
             self.cameras[cam_name] = Link(obj_id, link_id, self.cid)
             self.nb_cam += 1
-
     def add_object(self, urdf_fn, obj_id, globalScaling=1.0):
         # Load urdf file by urdfpy
         robot = URDF.load(urdf_fn)
-
+        logger.info(urdf_fn)
         for link_id, link in enumerate(robot.links):
             if len(link.visuals) == 0:
                 continue
@@ -159,9 +313,9 @@ class Sensor:
 
             obj_trimesh = obj_trimesh.apply_transform(pose)
             obj_name = "{}_{}".format(obj_id, link_id)
-
+            self.scene_objects[obj_name]=robot
             self.objects[obj_name] = Link(obj_id, link_id, self.cid)
-            position, orientation = self.objects[obj_name].get_pose()
+            position, orientation = self.objects[obj_name].get_pose(self.dataReceiver)
 
             # Add object in pyrender
             self.renderer.add_object(
@@ -170,12 +324,20 @@ class Sensor:
                 position=position,  # [-0.015, 0, 0.0235],
                 orientation=orientation,  # [0, 0, 0],
             )
+    def resetDebugVisualizerCamera(self,**params):
+        self.setup.resetDebugVisualizerCamera(**params)
+    def add_body(self, **body):
+        self.setup.add_object(**body)
+    def run_resetDebugVisualizerCamera(self):
+        p.resetDebugVisualizerCamera(**self.setup.reset_params)
+        
+    def init_objects(self):
+        for obj in self.setup.setup_objects:
 
-    def add_body(self, body):
-        self.add_object(
-            body.urdf_path, body.id, globalScaling=body.global_scaling or 1.0
-        )
-
+            pxbody=px.Body(**obj.params)
+            self.add_object(
+                pxbody.urdf_path, pxbody.id, globalScaling=pxbody.global_scaling or 1.0
+            )
     def loadURDF(self, *args, **kwargs):
         warnings.warn(
             "\33[33mSensor.loadURDF is deprecated. Please use body = "
@@ -206,21 +368,31 @@ class Sensor:
         """
         Update the pose of each objects registered in tacto simulator
         """
+        
         for obj_name in self.objects.keys():
-            self.object_poses[obj_name] = self.objects[obj_name].get_pose()
+            self.object_poses[obj_name] = self.objects[obj_name].get_pose(self.dataReceiver)
+            if self.objects[obj_name].mesh is not None:
+                #print(type(self.objects[obj_name].mesh))
+                #print(self.objects[obj_name].mesh)
+                #print(type(self.renderer.current_object_nodes[obj_name].mesh))
+                self.renderer.current_object_nodes[obj_name].mesh=pyrender.Mesh.from_trimesh(self.objects[obj_name].mesh)
+                self.renderer.object_nodes[obj_name].mesh==self.objects[obj_name].mesh
 
     def get_force(self, cam_name):
         # Load contact force
 
         obj_id = self.cameras[cam_name].obj_id
         link_id = self.cameras[cam_name].link_id
-
+        self.normal_forces[cam_name] = collections.defaultdict(float)
+        if self.cameras[cam_name].force!=None:
+            obj_name = "{}_{}".format(2, -1)
+            self.normal_forces[cam_name][obj_name]=float(self.cameras[cam_name].force)
+            return self.normal_forces[cam_name]
         pts = p.getContactPoints(
             bodyA=obj_id, linkIndexA=link_id, physicsClientId=self.cid
         )
 
         # accumulate forces from 0. using defaultdict of float
-        self.normal_forces[cam_name] = collections.defaultdict(float)
 
         for pt in pts:
             body_id_b = pt[2]
@@ -257,7 +429,6 @@ class Sensor:
         """
 
         self._update_object_poses()
-
         colors = []
         depths = []
 
@@ -265,12 +436,13 @@ class Sensor:
             cam_name = "cam" + str(i)
 
             # get the contact normal forces
-            normal_forces = self.get_force(cam_name)
 
+            normal_forces = self.get_force(cam_name)
+            position, orientation = self.cameras[cam_name].get_pose(self.dataReceiver)
+            
+            self.renderer.update_camera_pose(position, orientation)
             if normal_forces:
-                position, orientation = self.cameras[cam_name].get_pose()
-                self.renderer.update_camera_pose(position, orientation)
-                color, depth = self.renderer.render(self.object_poses, normal_forces)
+                color, depth = self.renderer.render(position,orientation,object_poses=self.object_poses, normal_forces=normal_forces)
 
                 # Remove the depth from curved gel
                 for j in range(len(depth)):

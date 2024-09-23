@@ -1,0 +1,62 @@
+SceneObjectGeneratorBlock_0:
+  abdominal_wall_A.obj:
+    fat_amount: 0.568228632332338
+    fat_up_vector:
+    - 0
+    - 0
+    - 1
+    fill_with_fat: true
+    id: 0
+    outset_amplitude: 0.04035667001171853
+    outset_frequency: 6.5789230495802595
+    source_file: ''
+  attached_organ_A.obj:
+    blood_flow_per_mass: 1.6666666666666667e-05
+    density: 1050.0
+    filename_oxygen_demand_map: ''
+    filename_supply_map: ''
+    id: 0
+    rigid_transform: true
+    source_file: ''
+    voxel_resolution: 1.0
+  attached_organ_B.obj:
+    blood_flow_per_mass: 1.6666666666666667e-05
+    density: 1050.0
+    filename_oxygen_demand_map: ''
+    filename_supply_map: ''
+    id: 1
+    rigid_transform: true
+    source_file: ''
+    voxel_resolution: 1.0
+  fixed_attachments_A.obj:
+    id: 0
+    source_file: ''
+    surface_amount: 0.034091892219985195
+  ligament_A.obj:
+    id: 0
+    rest_length_factor: 0.7123189082552492
+    source_file: ''
+    stiffness: 217.5697883552159
+  ligament_B.obj:
+    id: 1
+    rest_length_factor: 1.1356790196367346
+    source_file: ''
+    stiffness: 187.50730591825467
+  surface_A.stl:
+    add_concavity: true
+    blood_flow_per_mass: 1.6666666666666667e-05
+    cut_to_fit: true
+    density: 1050.0
+    filename_oxygen_demand_map: ''
+    filename_supply_map: ''
+    id: 0
+    mass_density: 1
+    poisson_ratio: 0.47273863208820904
+    predeform_noise: true
+    predeform_twist: true
+    size_x: 0.3
+    size_y: 0.3
+    size_z: 0.3
+    source_file: ''
+    voxel_resolution: 1.0
+    young_modulus: 25799.3899911763

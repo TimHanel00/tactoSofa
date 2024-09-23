@@ -32,6 +32,8 @@ Alternatively, you can manually clone the repository and install the package usi
 
 ```bash
 git clone https://github.com/facebookresearch/tacto.git
+git submodule init --recursive
+wget https://github.com/sofa-framework/sofa/releases/download/v22.12.00/SOFA_v22.12.00_Linux.zip
 cd tacto
 pip install -e .
 ```
