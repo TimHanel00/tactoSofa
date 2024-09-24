@@ -85,6 +85,7 @@ class Sender(threading.Thread):
         self.running = True
     def update(self, name,pos, orientation, forces=None,mesh=None):
         
+        
         self.curData.addObject(sofaObject(name=name,position=pos,orientation=orientation,forces=forces,mesh=mesh))
     def init_object(self, name, id, pos, orientation, forces=None,mesh=None):
         self.curData.addObject(sofaObject(name=name,id=id,position=pos,orientation=orientation,forces=forces,mesh=mesh))
@@ -92,8 +93,7 @@ class Sender(threading.Thread):
     def copyLatest(self):
         ret=TransportData()
         for key,val in self.curData.getDict().items():
-            pos=[val.position[0],val.position[1],val.position[2]]
-            ret.addObjectG(key,sofaObject(name=val.name,id=val.id,position=pos,orientation=val.orientation,forces=val.forces,mesh=val.mesh))
+            ret.addObjectG(key,sofaObject(name=val.name,id=val.id,position=val.position,orientation=val.orientation,forces=val.forces,mesh=val.mesh))
         #print(ret.sofaOjectDict)
         return ret
     def run(self):

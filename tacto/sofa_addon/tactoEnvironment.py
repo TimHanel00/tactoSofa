@@ -11,6 +11,7 @@ import tacto
 import threading
 import logging
 from time import sleep
+import pybullet_data
 from tacto.sofa_addon.dataTransport import TransportData,DataReceiver,Sender
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,6 @@ def setupSendToSofa(dataSender,digits):
                 cam_mesh=visual.geometry.mesh.filename
                 log.info(cam_mesh)
         dataSender.init_object(name=obj_name,id=obj_id,pos=position,orientation=orientation,forces=0.0,mesh=cam_mesh)
-    
     for obj_name in digits.scene_objects:
         obj_urdf=digits.scene_objects[obj_name]
         obj_mesh=None
@@ -73,7 +73,7 @@ def tactoLaunch(connectors,digits):
     setupSendToSofa(dataSender,digits)
     from time import sleep
     dataSender.start()
-    sleep(1)
+    sleep(0.2)
     dataSender.stop()
     # Create control panel to control the 6DoF pose of the object
     #panel = px.gui.PoseControlPanel(obj, **cfg.object_control_panel)

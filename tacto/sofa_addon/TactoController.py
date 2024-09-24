@@ -223,7 +223,9 @@ class TactoController(Sofa.Core.Controller):
         
         if self.getCollisionEstimatedForce()==0 or self.mode==1:
             sendForce=0.0
-        self.dataSender.update("Sensor",self.transformWrapper.getPosition(),self.getAngles(),sendForce,mesh=None)
+        #print(f'update tacto {self.tactoName}')
+        self.dataSender.update(self.tactoName,self.transformWrapper.getPosition(),self.getAngles(),sendForce*2,mesh=None)
+        #print(f'update sofa {self.sofaObjects[0].tactoName}')
         self.dataSender.update(name=self.sofaObjects[0].tactoName,pos=None,orientation=None,mesh=exportMesh(self))
     def reset(self):
         self.transformWrapper.setPosition(self.init_state)
@@ -243,6 +245,7 @@ class TactoController(Sofa.Core.Controller):
         self.parent.addObject("MeshSTLLoader",name="TactoMeshLoader",triangulate="true",filename=meshfile)
         self.parent.addObject("MeshSTLLoader",name="GelMeshLoader",triangulate="true",filename="meshes/gel.stl")
         self.node=self.parent.addChild(name)
+        self.tactoName=name
         self.contacts=0
         rotQ=Quat.createFromEuler(list(orientation))
         self.init_state=[position[0],position[1],position[2],rotQ[0],rotQ[1],rotQ[2],rotQ[3]]

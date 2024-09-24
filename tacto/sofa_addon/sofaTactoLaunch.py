@@ -28,7 +28,7 @@ from tacto.sofa_addon.dataTransport import TransportData, Sender,DataReceiver
 # Choose in your script to activate or not the GUI
 USE_GUI = True
 import trimesh
-
+tmpMeshes=[]
 def stl_to_tetrahedral_vtk(stl_path, vtk_output_path):
         if os.path.exists(vtk_output_path):
             print(f"File already exists: {vtk_output_path}")
@@ -67,6 +67,7 @@ logger = logging.getLogger('SOFA-Simulation')
 def createScene(root,dataSend,setupReceive):
     log = logging.getLogger(__name__)
     global solver
+    global tmp_mesh
     env=Environment(root)
     log.info("after env")
     material=Material(
@@ -93,6 +94,7 @@ def createScene(root,dataSend,setupReceive):
     meshRootDir="meshes/"
     objectlist=[]
     sensorObj=None
+    tmp_mesh =""
     for objName in setupReceive.latest_data.sofaOjectDict:
         obj=setupReceive.latest_data.sofaOjectDict[objName]
         if obj.forces==-1.0:
@@ -102,7 +104,9 @@ def createScene(root,dataSend,setupReceive):
             sensorObj=obj
     
             log.info(meshRootDir+obj.mesh)
+    
     for obj in objectlist:
+        tmpMeshes.append(obj.mesh)
         tissue = root.addObject(Tissue(
                                 root,
                                 simulation_mesh_filename="meshes/preop_volume.vtk",
@@ -125,13 +129,13 @@ def createScene(root,dataSend,setupReceive):
                                 )
                             )
         tissueList.append(tissue)
-    logger.info("awdpoakwdpokaw "+str(sensorObj.orientation))
-    root.addObject(TactoController(name = sensorObj.name,sofaObjects=tissueList,meshfile=meshRootDir+sensorObj.mesh,senderD=dataSend,parent=root,solver=solver,stiffness=10.0,position=sensorObj.position,orientation=sensorObj.orientation,forceMode=ForceMode.dof,controllMode=ControllMode.forceField))
+
+    root.addObject(TactoController(name = sensorObj.name,sofaObjects=tissueList,meshfile=meshRootDir+sensorObj.mesh,senderD=dataSend,parent=root,solver=solver,stiffness=10.0,position=sensorObj.position,orientation=sensorObj.orientation,forceMode=ForceMode.dof,controllMode=ControllMode.position))
     #print(type(tissue))
     #createCollisionMesh(root)
-    log.info("got it1")
-    
-    log.info("got it")
+
+
+# Check if file exists before removing
     return root
 class connects:
     toSofa, fromTacto = Pipe()
@@ -157,6 +161,10 @@ def sofaSimLoop(connects):
     Sofa.Gui.GUIManager.closeGUI()
     setupReceive.join()
     dataSend.join()  
+    global tmp_mesh
+    for i in tmp_mesh:
+        if os.path.exists(i):
+            os.remove(i)
         #containsSendingAnd ContainingPipes getting Initialized in Sensor
     #aim should be only setting up pipe and processes and objects specified by config name in main rest handled by 
     #even better setting up a sofaTacto=SofaTactoStart(sensor=sensorObj) 

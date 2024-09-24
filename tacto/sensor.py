@@ -56,17 +56,23 @@ def getSofaName(linkobj):
     if linkobj.obj_id==2:
         return "Tissue"
     return ""
+def equalArray(ar1,ar2):
+    for i in range(len(ar1)):
+        if ar1[i] != ar2[i]:  # Compare elements at the same index
+            return False
+    return True
 def tissueHandle(link,sofaObject):
     pos=sofaObject.position
+    new_pos=[pos[0],pos[1],pos[2]]
+    new_pos[2]+=2.0
     orient=[degtoRad(i) for i in sofaObject.orientation]
-    link.mesh=sofaObject.mesh
-    if link.mesh is not None:
+    if sofaObject.mesh is not None:
         #print("updatingMesh")
-        
+        link.mesh=sofaObject.mesh
         
         #print(self.mesh)
-        vertices = link.mesh.vertices.tolist()  # Convert to list
-        indices = link.mesh.faces.flatten().tolist()     # Convert to list
+        vertices = sofaObject.mesh.vertices.tolist()  # Convert to list
+        indices = sofaObject.mesh.faces.flatten().tolist()     # Convert to list
         #print(vertices)
         #print(indices)
         new_visual_shape = p.createVisualShape(
@@ -78,16 +84,19 @@ def tissueHandle(link,sofaObject):
             indices=indices)
         old_id=link.pybullet_id
 
-        link.pybullet_id = p.createMultiBody(basePosition=pos,baseOrientation=orient,baseVisualShapeIndex=new_visual_shape, baseCollisionShapeIndex=new_collision_shape)
-        from time import sleep
-        sleep(0.01)
+        link.pybullet_id = p.createMultiBody(basePosition=new_pos,baseOrientation=orient,baseVisualShapeIndex=new_visual_shape, baseCollisionShapeIndex=new_collision_shape)
+        
+        
         p.removeBody(old_id)
-    
-    if link.force is not None:
+    if link.cam_name is not None:
         link.force=sofaObject.forces
-        p.resetBasePositionAndOrientation(link.obj_id, pos, p.getQuaternionFromEuler(orient))
-                
-    return pos,orient 
+        comparray=pos+orient
+        if len(link.lastPos)>0 and not equalArray(link.lastPos,comparray):
+
+            p.resetBasePositionAndOrientation(link.pybullet_id, new_pos, p.getQuaternionFromEuler(orient))
+    from time import sleep
+    #sleep(0.01)           
+    return new_pos,orient 
 def sensorHandle(link,sofaObject,pos,orient):
     link.force=sofaObject.forces
     if link.force>10.0:
@@ -106,14 +115,17 @@ class Link:
     internalPos=None
     internalRot=None
     initSofaPos=None
+    lastPos=[]
     force=None
     mesh=None
+    cam_name=None
     sofaName=""
     pybullet_id: int #ID used explicitly for pybullet
-    def __init__(self,obj_id,link_id,cid):
+    def __init__(self,obj_id,link_id,cid,cam_name=None):
         self.obj_id=obj_id
         self.link_id=link_id
         self.cid=cid
+        self.cam_name=cam_name
         self.pybullet_id=self.obj_id
         self.name="{}_{}".format(obj_id, link_id)
 
@@ -138,6 +150,7 @@ class Link:
         if self.internalPos==None and self.internalRot==None:
             self.internalPos=position
             self.internalRot=orientation
+        
         #print(f'{self.link_id}+ obj Id: {self.obj_id}')
         """
         if( is digit sensor):
@@ -146,14 +159,15 @@ class Link:
         print(dataReceive.latest_data)
         for i in range(3):
             dataReceive.latest_data.position[i]*=10
-        """    
+        """  
+            
         #print(dataReceive.get())
         #print(position,orientation)
         #return dataReceive.get().position,dataReceive.get().orientation
         #print(str(position)+ " 1")
         pos=None
         orient=None
-        
+        import time  
         if dataReceive==None:
             #print("receiveNone")
             return position, orientation
@@ -161,11 +175,11 @@ class Link:
             #print("receiveDataNone")
             return position, orientation
         if self.name not in dataReceive.latest_data.getDict():
-            #print("name not in dict")
             return position, orientation
 
         obj =dataReceive.latest_data.getDict()[self.name]
-        pos,orient=tissueHandle(self,obj)       
+        pos,orient=tissueHandle(self,obj)
+        self.lastPos=pos+orient
         return pos,orient
 class setupObject:
     def __init__(self,**params):
@@ -276,7 +290,7 @@ class Sensor:
             cam_name = "cam" + str(self.nb_cam)
             obj_name = "{}_{}".format(obj_id, link_id)
             self.sensor_objects.append((cam_name,obj_name,urdf))
-            self.cameras[cam_name] = Link(obj_id, link_id, self.cid)
+            self.cameras[cam_name] = Link(obj_id, link_id, self.cid,cam_name=cam_name)
             self.nb_cam += 1
     def add_object(self, urdf_fn, obj_id, globalScaling=1.0):
         # Load urdf file by urdfpy
