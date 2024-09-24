@@ -12,6 +12,11 @@ import trimesh
 import heapq
 from enum import Enum,auto
 import cProfile
+import logging
+from core.sofa.objects.tissue import Tissue
+from core.sofa.components.forcefield import Material, ConstitutiveModel
+from core.sofa.components.solver import SolverType, TimeIntegrationType
+from tacto.sofa_addon.utils import stl_to_tetrahedral_vtk
 def readMesh():
     your_mesh = mesh.Mesh.from_file('mesh/.stl')
 
@@ -61,6 +66,7 @@ def findClosestVerts(verts, pos, num_closest=1):
     
     return closest_verts
 mesh=None
+firstEvent=True
 def exportMesh(node):
     global mesh
     triangles=node.parent.Tissue.Visual.VMapping.output.triangles.value
@@ -120,6 +126,7 @@ def baseNormalVec(node,XYZ=None):
     old_y=normalized_y
     return ret
 forceY=[]
+
 class ControllMode(Enum):
     
     forceField :int =1
@@ -137,15 +144,60 @@ class ForceMode(Enum):
     normal : int =2
     #approximate force based on nr of vertices in contact
     vertex : int = 3
+def createGlue(node):
+    glueNode = node.createChild('Glue')
+    glueNode.createObject('MeshSTLLoader', name='stlLoader', filename='meshes/gel.stl')
+    deformableMO = glueNode.createObject('MechanicalObject', name='glueMech', template='Vec3d',
+                                               position='@stlLoader.position')
+    glueNode.createObject('RigidMapping', input='@../TactoMechanics', output='@glueMech')
+    glueNode.createObject('TriangleSetTopologyContainer', name='topology', 
+                                triangles='@stlLoader.triangles')
 
 class TactoController(Sofa.Core.Controller):
     """ This controller monitors new sphere objects.
     Press ctrl and the L key to make spheres falling!
     """
+    def applyRelativetrans(self):
+        verts = np.array(self.gelNode.state.position.value)  # Convert to numpy array
+        pos = np.array(self.transformWrapper.getPosition())  # Convert to numpy array
+        angles_rad = Quat(self.transformWrapper.getOrientation().tolist()).getEulerAngles()
+        angles_rad_diff = np.array(angles_rad) - np.array(self.oldAngles)
+
+        # Transfer points to their origin 
+        originVerts = verts - np.array(self.oldPos)
+
+        # Construct the rotation matrix
+        Rx = np.array([
+            [1, 0, 0],
+            [0, np.cos(angles_rad_diff[0]), -np.sin(angles_rad_diff[0])],
+            [0, np.sin(angles_rad_diff[0]), np.cos(angles_rad_diff[0])]
+        ])
+
+        Ry = np.array([
+            [np.cos(angles_rad_diff[1]), 0, np.sin(angles_rad_diff[1])],
+            [0, 1, 0],
+            [-np.sin(angles_rad_diff[1]), 0, np.cos(angles_rad_diff[1])]
+        ])
+
+        Rz = np.array([
+            [np.cos(angles_rad_diff[2]), -np.sin(angles_rad_diff[2]), 0],
+            [np.sin(angles_rad_diff[2]), np.cos(angles_rad_diff[2]), 0],
+            [0, 0, 1]
+        ])
+
+        # Combine the rotation matrices into a single rotation matrix
+        rotation_matrix = Rz @ Ry @ Rx
+        # leverage np vectorization to rotate and the translate
+        transformed_verts = (originVerts @ rotation_matrix.T) + pos
+
+        # Assign the transformed vertices back to the mechanical object
+        self.gelNode.state.position.value = transformed_verts.tolist()
+
+        self.oldAngles=[angles_rad[0],angles_rad[1],angles_rad[2]]
+        self.oldPos=[pos[0],pos[1],pos[2]]
     def addBasics(self,node):
         plugins=['SofaRigid']
         plugins.append('SofaConstraint')
-        plugins.append('SofaImplicitOdeSolver')
         plugins.append('Sofa.Component.Haptics')
         node.addObject('EulerImplicitSolver', name="cg_odesolver")
         if self.solver!=None:
@@ -157,17 +209,48 @@ class TactoController(Sofa.Core.Controller):
         visual=node.addChild("Visual")
         visual.addObject("OglModel",name="VisualModel",src="@../../TactoMeshLoader")
         visual.addObject('RigidMapping')
+    def makefixedVerts(self):
+        threshhold=0.018
+        outar=[]
+        print(self.gelNode.state.position.value)
+        for i,vert in enumerate(self.gelNode.state.position.value):
+            print(vert)
+            if vert[0]<threshhold:
+                outar.append(i)
+        result = ' '.join(map(str, outar))
+        return result
     def addCollision(self,node):
-        collision = node.addChild('collision')
-
-        collision.addObject('MeshTopology', src="@../../TactoMeshLoader")
-        collision.addObject('MechanicalObject')
-        #node.addObject('FixedConstraint', name="FixedConstraint", indices="0")
-        collision.addObject('TriangleCollisionModel',contactStiffness=self.stiffness)
-        #collision.addObject('LineCollisionModel')
-        #collision.addObject('PointCollisionModel')
-        collision.addObject('RigidMapping')
-        return collision
+        material=Material(
+                                young_modulus = 200000.0,
+                                poisson_ratio = 0.47273863208820904,
+                                constitutive_model = ConstitutiveModel.COROTATED,
+                                mass_density = .15
+                            )
+        self.gelNode = node.addObject(Tissue( self.parent,
+                                #simulation_mesh_filename="meshes/preop_volume.vtk",
+                                simulation_mesh_filename=stl_to_tetrahedral_vtk("meshes/gel.stl","meshes/mesh_gel_out.vtk"),#"meshes/preop_volume.vtk",
+                                material= material,
+                                node_name="collisionGel",
+                                tactoName="collisionGel",
+                                check_displacement=False,
+                                #grid_resolution=[8,2,6], # for simulation with hexa
+                                solver=self.solver,
+                                analysis=TimeIntegrationType.EULER,
+                                surface_mesh="meshes/gel.stl", # e.g. surface for visualization or collision
+                                view=True,
+                                position=[0,0,0],
+                                orientation=[0,0,0],
+                                collision=True,
+                                contact_stiffness=10,
+                                massDensity=.15))
+        #createGlue(node)
+        fixedVerts=[]
+        self.gelNode.node.addObject('FixedConstraint', name="FixedConstraint", indices=self.makefixedVerts())
+        #gelNode.node.addObject('RigidMapping',mapForces=0,input='@../TactoMechanics', output='@MechanicalObject_state')
+        #merge.addObject("BarycentricMapping", name="VMapping", input="@../collisionGel/MechanicalObject_state", output="@mergeMech")
+        self.gel=self.gelNode.node
+        #self.gelNode.node.addObject('ConstantForceField', name="CFF", totalForce=[0.1, 0.0, 0.0, 0, 0, 0, 0])
+        return self.gelNode.node.Collision
     def getDofForce(self):
         force= self.rigidobject.force.array()
         forceRet=0.0
@@ -196,8 +279,13 @@ class TactoController(Sofa.Core.Controller):
             if nr_contacts>100:
                 ret=100
         return ret
+    
     def onAnimateEndEvent(self, __):
+        global firstEvent
         
+        if firstEvent==True:
+            self.transformWrapper.setPosition(self.init_state)
+            firstEvent=False
         if self.controllMode==ControllMode.directedForceFieldAtContact:
             x,y,z=baseNormalVec(self)
             self.node.CFF.totalForce.value=[x*self.forceApply, y*self.forceApply, z*self.forceApply, 0, 0, 0]
@@ -219,10 +307,11 @@ class TactoController(Sofa.Core.Controller):
                 self.node.CFF.totalForce.value=[0, 0, 0, 0, 0, 0]
                 
                 #print(f' Force after: {self.node.CFF.totalForce.value}')
-        
+
         
         if self.getCollisionEstimatedForce()==0 or self.mode==1:
             sendForce=0.0
+        self.applyRelativetrans()
         #print(f'update tacto {self.tactoName}')
         self.dataSender.update(self.tactoName,self.transformWrapper.getPosition(),self.getAngles(),sendForce*2,mesh=None)
         #print(f'update sofa {self.sofaObjects[0].tactoName}')
@@ -231,8 +320,6 @@ class TactoController(Sofa.Core.Controller):
         self.transformWrapper.setPosition(self.init_state)
         self.rigidobject.velocity.value=[[0, 0, 0, 0, 0, 0]]
         self.node.CFF.totalForce.value=[0, 0, 0, 0, 0, 0]
-        for vals in self.parent.Tissue.MechanicalObject_state.velociy.value:
-            vals=[0, 0, 0, 0, 0, 0]
         self.forceApply=0.0
     def __init__(self, name:str,meshfile : str,parent:Sofa.Core.Node,sofaObjects=None,stiffness=5.0,senderD=None,solver=None,position=[0.0,0.0,0.0],orientation=[0,0,0,0],forceMode :ForceMode=ForceMode.dof, controllMode:ControllMode=ControllMode.position ):
         Sofa.Core.Controller.__init__(self)
@@ -250,7 +337,9 @@ class TactoController(Sofa.Core.Controller):
         rotQ=Quat.createFromEuler(list(orientation))
         self.init_state=[position[0],position[1],position[2],rotQ[0],rotQ[1],rotQ[2],rotQ[3]]
         self.addBasics(self.node)
-        self.rigidobject=self.node.addObject("MechanicalObject",template="Rigid3d",name="TactoMechanics",position=self.init_state)
+        self.rigidobject=self.node.addObject("MechanicalObject",template="Rigid3d",name="TactoMechanics",position=[0.0, 0.0, 0.0, 0, 0, 0, 0])
+        self.oldAngles=[0,0,0]
+        self.oldPos=[0,0,0]
         self.node.addObject("UniformMass",vertexMass=[1., 1., [1., 0., 0., 0., 1., 0., 0., 0., 1.][:]])
         self.addVisuals(self.node)
         self.collision=self.addCollision(self.node)
@@ -260,7 +349,7 @@ class TactoController(Sofa.Core.Controller):
         self.listeners =[self.node.addObject(
             "ContactListener",
             collisionModel1=objects.node.getChild("Collision").getObject("CollisionModel").getLinkPath(),
-            collisionModel2=self.collision.getObject('TriangleCollisionModel').getLinkPath(),
+            collisionModel2=self.collision.CollisionModel.getLinkPath(),
         )for objects in sofaObjects]
         #cProfile.run('self.onAnimateEndEvent()')
         self.forceApply=10000.0

@@ -13,7 +13,6 @@ from core.sofa.components.forcefield import Material, add_forcefield
 from utils.sofautils import get_bbox, check_valid_displacement, get_distance_np
 from utils.vtkutils import has_tetra
 from core.log import Log
-from splib3.numerics.quat import Quat
 import math
 def read_mesh_file(location):
     location=os.path.join(os.getcwd(),location)
@@ -61,6 +60,7 @@ class Tissue(Sofa.Core.Controller):
                 grid_resolution: list = [10,10,10],
                 use_caribou: bool = False,
                 solver=None,
+                tactoName:str ="",
                 analysis: TimeIntegrationType = TimeIntegrationType.EULER,
                 collision: bool = False,
                 check_displacement : bool =False,
@@ -74,9 +74,8 @@ class Tissue(Sofa.Core.Controller):
                 view: bool = False,
                 senderD = None,
                 massDensity : float =0.01,
-                position=[0.0,0.0,0.0],
-                orientation=[0.0,0.0,0.0],
-                tactoName=""
+                position:float=[0,0,0],
+                orientation:float=[0,0,0]
                 
     ):
         """ 
@@ -104,8 +103,7 @@ class Tissue(Sofa.Core.Controller):
             print("Error no simulation mesh defined")
             return
         else:
-            #simulation_mesh=read_mesh_file(simulation_mesh_filename)
-            simulation_mesh=None
+            simulation_mesh=read_mesh_file(simulation_mesh_filename)
         super().__init__(self)
         self.tactoName=tactoName
         self.check_displacement=check_displacement
@@ -126,17 +124,12 @@ class Tissue(Sofa.Core.Controller):
         # --------------------------------------------------#
         tissue_node = parent_node.addChild(node_name)
         self.node = tissue_node
-        parent_node.addObject("MeshSTLLoader",name="meshLoaderFine",filename=surface_mesh)
+        meshLoaderSurface=self.node.addObject("MeshSTLLoader",name="meshLoaderFine",filename=surface_mesh)
         
         # Get mesh bounding box
-        #xmin, xmax, ymin, ymax, zmin, zmax = get_bbox( simulation_mesh.GetPoints().GetData() )
-        #self.bounding_box = [xmin, ymin, zmin, xmax, ymax, zmax]
-        topology_type = Topology.TETRAHEDRON
-        topology_loader = add_loader( parent_node=self.node,
-                                         filename = simulation_mesh_filename,
-                                         name = f"{node_name}_loader" 	
-                                         )
-        """else:
+        xmin, xmax, ymin, ymax, zmin, zmax = get_bbox( simulation_mesh.GetPoints().GetData() )
+        self.bounding_box = [xmin, ymin, zmin, xmax, ymax, zmax]
+
         # Topology
         if has_tetra(simulation_mesh):
             Log.log(module="Sofa", msg="Tissue FEM will have tetrahedral topology")
@@ -152,10 +145,10 @@ class Tissue(Sofa.Core.Controller):
                                                     name=f"{node_name}_grid_topology", 
                                                     min=self.bounding_box[:3],
                                                     max=self.bounding_box[3:],
-                                                    n=grid_resolution)
-        """                                        
-        if surface_mesh is None:
-            surface_mesh = simulation_mesh		
+                                                    n=grid_resolution
+                                                    )
+            if surface_mesh is None:
+                surface_mesh = simulation_mesh		
         
         # Topology
         self.volume_topology = add_topology( parent_node=self.node,
@@ -167,15 +160,17 @@ class Tissue(Sofa.Core.Controller):
         # Mechanical object
         self.state = self.node.addObject('MechanicalObject', 
                                             src=self.volume_topology.getLinkPath(), 
-                                            name="MechanicalObject_state", 
+                                            name=f"{node_name}_MechanicalObject_state", 
                                             template="Vec3d",
-                                            position=[position[0],position[1],position[2]],
-                                            showObject=False)
+                                            showObject=False,
+                                            position=f"@{node_name}_topology.position"
+                                            )
         self.transformWrapper=RigidDof(self.state)
+        #self.transformWrapper.setPosition(position)
         pos=self.transformWrapper.getPosition()
         angles=self.getAngles()
         if self.dataSender is not None:
-            self.dataSender.update(self.tactoName,pos,angles)
+            self.dataSender.update("Tissue",pos,angles)
         self.fem = add_forcefield( parent_node=self.node,
                                     material=material,
                                     topology=topology_type,
@@ -212,6 +207,7 @@ class Tissue(Sofa.Core.Controller):
             surface_node_name = f"{node_name}Surface"
             surface_node = self.node.addChild(surface_node_name)
             self.surface_node=surface_node
+            self.surface_node = surface_node
 
             #self.surface_mesh_loader = add_loader( parent_node=parent_node,
                                                     #filename = surface_mesh,
@@ -219,9 +215,9 @@ class Tissue(Sofa.Core.Controller):
                                                     #)
             #add_mapping(parent_node=surface_node, mapping_type=MappingType.BARYCENTRIC)
             self.visual=tissue_node.addChild("Visual")
-            self.visual.addObject("OglModel",name="VisualModel",src="@../../meshLoaderFine")
+            self.visual.addObject("OglModel",name="VisualModel",src=meshLoaderSurface.getLinkPath())
             self.visual.addObject("MechanicalObject",template="Vec3d",name="StoringVis",scale=1.0)
-            self.visual.addObject("BarycentricMapping", name="VMapping", input="@../MechanicalObject_state", output="@VisualModel")
+            self.visual.addObject("BarycentricMapping", name="VMapping", input=f"@../{node_name}_MechanicalObject_state", output="@VisualModel")
             #self.visual.addObject("BarycentricMapping", name="VMapping", input="@../MechanicalObject_state", output="@meshTransform")
             #self.visual.addObject("STLExporter",filename='mesh/surface_out.stl',position="@VisualModel.position",triangle="@VisualModel.triangles",exportEveryNumberOfSteps="10")
             
@@ -238,13 +234,12 @@ class Tissue(Sofa.Core.Controller):
                 #collision.addObject("TriangleCollisionModel",name="CollisionModel",contactStiffness=1.0)
                 #collision.addObject("BarycentricMapping",name="CollisionMapping",input="@../MechanicalObject_state", output="@StoringForces")
                 self.collision=self.node.addChild("Collision")
-                self.collision.addObject("Mesh",src="@../../meshLoaderFine")
+                self.collision.addObject("Mesh",src=meshLoaderSurface.getLinkPath())
                 self.collision.addObject("MechanicalObject",template="Vec3d",name="StoringForces",scale=1.0)
                 self.collision.addObject("TriangleCollisionModel",name="CollisionModel",contactStiffness=self.stiffness)
-                self.collision.addObject("BarycentricMapping",name="CollisionMapping",input="@../MechanicalObject_state", output="@StoringForces")
+                self.collision.addObject("BarycentricMapping",name="CollisionMapping",input=f"@../{node_name}_MechanicalObject_state", output="@StoringForces")
 
                 print(" added collision models")
-    
     def radTodeg(self,angle):
          return (angle*180)/math.pi
     def mapping(self):
@@ -255,17 +250,18 @@ class Tissue(Sofa.Core.Controller):
     def onSimulationInitDoneEvent(self, __):
         self.previous_pos = np.asarray(self.state.rest_position.value)
     def getAngles(self):
+        
         from splib3.numerics.quat import Quat
         eulerAngles= Quat(self.transformWrapper.getOrientation().tolist()).getEulerAngles()
         return [round(self.radTodeg(el),4) for el in eulerAngles]
     def onAnimateEndEvent(self, __):
         # Check for simulation instability at the end of each time step
         #print(f'pos: {self.transformWrapper.getPosition()}')
-        
         pos=self.transformWrapper.getPosition()
         angles=self.getAngles()
         if self.dataSender is not None:
             self.dataSender.update(self.tactoName,pos,angles)
+        
         return
         if(self.check_displacement):
             #print(type(self.state.position))
@@ -274,7 +270,7 @@ class Tissue(Sofa.Core.Controller):
             self.previous_pos = current_pos
             
             self.is_stable, self.is_moving = check_valid_displacement(displ, low_thresh=1e-01, high_thresh=0.4)		
-
+        
     def reset(self):
         with self.state.position.writeable() as positions:
             positions[:] = self.state.rest_position.value
@@ -300,4 +296,3 @@ class Tissue(Sofa.Core.Controller):
                 positions[i] = self.state.rest_position.value[i]
 
         
-

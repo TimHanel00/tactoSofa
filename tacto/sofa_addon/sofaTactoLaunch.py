@@ -18,8 +18,7 @@ from threading import Thread
 from tacto.sofa_addon.SofaRootConfig import Environment,Solver
 import tacto.sofa_addon.tactoEnvironment
 import numpy as np
-import tetgen
-import gmsh
+from tacto.sofa_addon.utils import stl_to_tetrahedral_vtk
 import pyvista as pv
 #import tacto  # Import TACTO
 import vtk
@@ -29,36 +28,7 @@ from tacto.sofa_addon.dataTransport import TransportData, Sender,DataReceiver
 USE_GUI = True
 import trimesh
 tmpMeshes=[]
-def stl_to_tetrahedral_vtk(stl_path, vtk_output_path):
-        if os.path.exists(vtk_output_path):
-            print(f"File already exists: {vtk_output_path}")
-            return vtk_output_path  # Or handle as needed
 
-        gmsh.initialize()
-        gmsh.open(stl_path)
-
-        # This is how you set options for gmsh:
-        # TODO: Make these configurable!
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 0.01)
-
-        # Print the model name and dimension:
-        #print('Model ' + gmsh.model.getCurrent() + ' (' +
-        #    str(gmsh.model.getDimension()) + 'D)')
-
-        n = gmsh.model.getDimension()
-        s = gmsh.model.getEntities(n)
-        l = gmsh.model.geo.addSurfaceLoop([s[i][1] for i in range(len(s))])
-        gmsh.model.geo.addVolume([l])
-        gmsh.model.geo.synchronize()
-
-        gmsh.model.mesh.generate(dim=3)
-        gmsh.model.mesh.optimize(method="Netgen", force=True)
-
-        # Print the model name and dimension:
-        #print('Model ' + gmsh.model.getCurrent() + ' (' +
-        #    str(gmsh.model.getDimension()) + 'D)')
-        gmsh.write(vtk_output_path)
-        return vtk_output_path
 vtkMesh=None
 material=None
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -107,6 +77,7 @@ def createScene(root,dataSend,setupReceive):
     
     for obj in objectlist:
         tmpMeshes.append(obj.mesh)
+
         tissue = root.addObject(Tissue(
                                 root,
                                 simulation_mesh_filename="meshes/preop_volume.vtk",
@@ -129,8 +100,9 @@ def createScene(root,dataSend,setupReceive):
                                 )
                             )
         tissueList.append(tissue)
-
-    root.addObject(TactoController(name = sensorObj.name,sofaObjects=tissueList,meshfile=meshRootDir+sensorObj.mesh,senderD=dataSend,parent=root,solver=solver,stiffness=10.0,position=sensorObj.position,orientation=sensorObj.orientation,forceMode=ForceMode.dof,controllMode=ControllMode.position))
+    
+    tactoController=root.addObject(TactoController(name = sensorObj.name,sofaObjects=tissueList,meshfile=meshRootDir+sensorObj.mesh,senderD=dataSend,parent=root,solver=solver,stiffness=10.0,position=sensorObj.position,orientation=sensorObj.orientation,forceMode=ForceMode.dof,controllMode=ControllMode.position))
+    
     #print(type(tissue))
     #createCollisionMesh(root)
 
