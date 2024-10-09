@@ -1,7 +1,7 @@
 # non-rigid-Tacto
 Group Project for Robot Learning at TU Dresden -- aim is to extend the tacto tactile Simulator https://github.com/facebookresearch/tacto to work with non-rigid bodies
 
-for a simple Installation using docker refer to tactoSofa_readme.md but there is only support for nvidia gpus
+for a simple Installation using docker refer to **README_tactoSofa.md** but there is only support for nvidia gpus
 ## Tacto usage:
 ubuntu 22.04
 
