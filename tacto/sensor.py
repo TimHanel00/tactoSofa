@@ -89,18 +89,22 @@ def tissueHandle(link,sofaObject):
         
         p.removeBody(old_id)
     if link.cam_name is not None:
-        link.force=sofaObject.forces
+        link.oldlinkForces=link.force  
+        
+        if link.force is None or link.force<1e-5:
+
+            link.force=link.oldlinkForces
         comparray=pos+orient
         if len(link.lastPos)>0 and not equalArray(link.lastPos,comparray):
 
             p.resetBasePositionAndOrientation(link.pybullet_id, new_pos, p.getQuaternionFromEuler(orient))
+        link.force =0.0
     from time import sleep
-    #sleep(0.01)           
+    #sleep(0.01)         
+    
     return new_pos,orient 
 def sensorHandle(link,sofaObject,pos,orient):
     link.force=sofaObject.forces
-    if link.force>10.0:
-        print(link.force)
     p.resetBasePositionAndOrientation(link.obj_id, pos, p.getQuaternionFromEuler(orient))
     return pos,orient
 def default(link,sofaObject,pos,orient):
@@ -116,6 +120,7 @@ class Link:
     internalRot=None
     initSofaPos=None
     lastPos=[]
+    oldlinkForces=0.0
     force=None
     mesh=None
     cam_name=None
@@ -180,6 +185,7 @@ class Link:
         obj =dataReceive.latest_data.getDict()[self.name]
         pos,orient=tissueHandle(self,obj)
         self.lastPos=pos+orient
+
         return pos,orient
 class setupObject:
     def __init__(self,**params):

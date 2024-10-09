@@ -67,12 +67,7 @@ def findClosestVerts(verts, pos, num_closest=1):
     return closest_verts
 mesh=None
 firstEvent=True
-def exportMesh(node):
-    global mesh
-    triangles=node.parent.Tissue.Visual.VMapping.output.triangles.value
-    positions=node.parent.Tissue.Visual.VMapping.output.position.value
-    mesh=trimesh.Trimesh(vertices=positions, faces=triangles)
-    return mesh
+
 def faceNormal(points):
     p1, p2, p3 = points
     
@@ -149,6 +144,7 @@ def createGlue(node):
     glueNode.createObject('MeshSTLLoader', name='stlLoader', filename='meshes/gel.stl')
     deformableMO = glueNode.createObject('MechanicalObject', name='glueMech', template='Vec3d',
                                                position='@stlLoader.position')
+    
     glueNode.createObject('RigidMapping', input='@../TactoMechanics', output='@glueMech')
     glueNode.createObject('TriangleSetTopologyContainer', name='topology', 
                                 triangles='@stlLoader.triangles')
@@ -162,7 +158,9 @@ class TactoController(Sofa.Core.Controller):
         pos = np.array(self.transformWrapper.getPosition())  # Convert to numpy array
         angles_rad = Quat(self.transformWrapper.getOrientation().tolist()).getEulerAngles()
         angles_rad_diff = np.array(angles_rad) - np.array(self.oldAngles)
-
+        tmp=angles_rad_diff[0]
+        angles_rad_diff[0]=angles_rad_diff[1]
+        angles_rad_diff[1]=-tmp
         # Transfer points to their origin 
         originVerts = verts - np.array(self.oldPos)
 
@@ -212,19 +210,28 @@ class TactoController(Sofa.Core.Controller):
     def makefixedVerts(self):
         threshhold=0.018
         outar=[]
-        print(self.gelNode.state.position.value)
         for i,vert in enumerate(self.gelNode.state.position.value):
-            print(vert)
             if vert[0]<threshhold:
                 outar.append(i)
         result = ' '.join(map(str, outar))
         return result
     def addCollision(self,node):
+        """
+        collision = node.addChild('collision')
+
+        collision.addObject('MeshTopology', src="@../../TactoMeshLoader")
+        collision.addObject('MechanicalObject')
+        #node.addObject('FixedConstraint', name="FixedConstraint", indices="0")
+        collision.addObject('TriangleCollisionModel',contactStiffness=self.stiffness)
+        #collision.addObject('LineCollisionModel')
+        #collision.addObject('PointCollisionModel')
+        collision.addObject('RigidMapping')
+        """
         material=Material(
-                                young_modulus = 200000.0,
-                                poisson_ratio = 0.47273863208820904,
+                                young_modulus = 1e5,
+                                poisson_ratio = 0.35,
                                 constitutive_model = ConstitutiveModel.COROTATED,
-                                mass_density = .15
+                                mass_density = 100
                             )
         self.gelNode = node.addObject(Tissue( self.parent,
                                 #simulation_mesh_filename="meshes/preop_volume.vtk",
@@ -241,8 +248,8 @@ class TactoController(Sofa.Core.Controller):
                                 position=[0,0,0],
                                 orientation=[0,0,0],
                                 collision=True,
-                                contact_stiffness=10,
-                                massDensity=.15))
+                                contact_stiffness=100,
+                                massDensity=material.mass_density))
         #createGlue(node)
         fixedVerts=[]
         self.gelNode.node.addObject('FixedConstraint', name="FixedConstraint", indices=self.makefixedVerts())
@@ -252,7 +259,7 @@ class TactoController(Sofa.Core.Controller):
         #self.gelNode.node.addObject('ConstantForceField', name="CFF", totalForce=[0.1, 0.0, 0.0, 0, 0, 0, 0])
         return self.gelNode.node.Collision
     def getDofForce(self):
-        force= self.rigidobject.force.array()
+        force= self.gel.state.force.array()
         forceRet=0.0
         for dof in force:
             forceRet+=(np.sum(np.array(dof))/len(dof))
@@ -282,7 +289,6 @@ class TactoController(Sofa.Core.Controller):
     
     def onAnimateEndEvent(self, __):
         global firstEvent
-        
         if firstEvent==True:
             self.transformWrapper.setPosition(self.init_state)
             firstEvent=False
@@ -307,15 +313,15 @@ class TactoController(Sofa.Core.Controller):
                 self.node.CFF.totalForce.value=[0, 0, 0, 0, 0, 0]
                 
                 #print(f' Force after: {self.node.CFF.totalForce.value}')
-
+        
         
         if self.getCollisionEstimatedForce()==0 or self.mode==1:
             sendForce=0.0
         self.applyRelativetrans()
         #print(f'update tacto {self.tactoName}')
-        self.dataSender.update(self.tactoName,self.transformWrapper.getPosition(),self.getAngles(),sendForce*2,mesh=None)
+        self.dataSender.update(self.tactoName,self.transformWrapper.getPosition(),self.getAngles(),sendForce,mesh=None)
         #print(f'update sofa {self.sofaObjects[0].tactoName}')
-        self.dataSender.update(name=self.sofaObjects[0].tactoName,pos=None,orientation=None,mesh=exportMesh(self))
+        
     def reset(self):
         self.transformWrapper.setPosition(self.init_state)
         self.rigidobject.velocity.value=[[0, 0, 0, 0, 0, 0]]
@@ -337,7 +343,7 @@ class TactoController(Sofa.Core.Controller):
         rotQ=Quat.createFromEuler(list(orientation))
         self.init_state=[position[0],position[1],position[2],rotQ[0],rotQ[1],rotQ[2],rotQ[3]]
         self.addBasics(self.node)
-        self.rigidobject=self.node.addObject("MechanicalObject",template="Rigid3d",name="TactoMechanics",position=[0.0, 0.0, 0.0, 0, 0, 0, 0])
+        self.rigidobject=self.node.addObject("MechanicalObject",template="Rigid3d",name="TactoMechanics",position=self.init_state)
         self.oldAngles=[0,0,0]
         self.oldPos=[0,0,0]
         self.node.addObject("UniformMass",vertexMass=[1., 1., [1., 0., 0., 0., 1., 0., 0., 0., 1.][:]])
@@ -393,14 +399,12 @@ class TactoController(Sofa.Core.Controller):
         print(f'Position after: {t1}')
     def applyForce(self,vec):
         ar=[]
-        print(vec)
         if self.key=='+':
                 for i in vec:
                     ar.append(i*10*self.scale*100)
         if self.key=='-':
                 for i in vec:
                     ar.append(-i*10*self.scale*100)
-        print(ar)
         self.node.CFF.totalForce.value=ar
     def trans(self):
         if self.controllMode==ControllMode.forceField:

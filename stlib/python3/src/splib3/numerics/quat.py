@@ -4,48 +4,8 @@ from math import pi, sqrt
 
 
 class Quat(numpy.ndarray):
-    """ The Quat class implements the following:
-
-    Public methods:
-    q = Quat() # several constructors are implemented
-
-    q.rotateFromQuat(q1)
-    q.rotateFromEuler(v)
-    q.normalize()
-    q.flip()
-    q.rotate(v)
-
-    q.getIm()
-    q.getRe()
-    q.getNorm()
-    q.getInverse()
-    q.getConjugate()
-    q.getMatrix()
-    q.getEulerAngles()
-    q.getAxisAngle()
-    q.toString()
-
-    Static methods:
-    q = Quat.product(q1,q2)
-    q = Quat.createFromEuler([x,y,z])
-    q = Quat.createFromAxisAngle([axis],angle)
-    """
 
     def __new__(cls, *args):
-        """ Quat constructor expects zero, one, or four arguments. Quat has the Sofa format i.e (x,y,z,w).
-
-        Examples:
-
-        >>> q = Quat()
-        >>> print(q)
-        [0.,0.,0.,1.]
-        >>> q = Quat(0.,0.,0.,1.)
-        >>> print(q)
-        [0.,0.,0.,1.]
-        >>> q = Quat([0.,0.,0.,1.])
-        >>> print(q)
-        [0.,0.,0.,1.]
-        """
         if len(args)==0:
             return super(Quat,cls).__new__(cls, shape=(4,), dtype=float, buffer=numpy.array([0.,0.,0.,1.]))
         elif hasattr(args[0],"__len__") and len(args[0])==4:
@@ -76,29 +36,9 @@ class Quat(numpy.ndarray):
         self /= self.getNorm()
 
     def rotateFromQuat(self, qb):
-        """Function rotateFromQuat of class Quat rotates the current Quat from the given one.
-
-        Examples:
-
-        >>> q1 = Quat.createFromAxisAngle([1., 0., 0.], pi/2.)
-        >>> q2 = Quat.createFromAxisAngle([0., -1., 0.], pi/2.)
-        >>> q1.rotateFromQuat(q2)
-        >>> print(q1)
-        [ 0.5 -0.5 -0.5  0.5]
-        """
-
         self.put(range(4),self.product(self,qb))
 
     def rotateFromEuler(self, v, axes="sxyz"):
-        """Function rotateFromEuler of class Quat combine the current Quat from euler angles.
-
-        Examples:
-
-        >>> q = Quat.createFromAxisAngle([1., 0., 0.], pi/2.)
-        >>> q.rotateFromEuler([0.,-pi/2.,0.])
-        >>> print(q)
-        [ 0.5 -0.5 -0.5  0.5]
-        """
 
         q = Quat.createFromEuler(v)
         self.put(range(4),self.product(self,q))
@@ -110,14 +50,6 @@ class Quat(numpy.ndarray):
             self.put(range(4),-1*self)
 
     def rotate(self,v):
-        """Function rotate of class Quat rotate a vector using a quaternion.
-            Examples:
-
-            >>> q = [0.707, 0.0, -0.707, 0.0]
-            >>> v = q.rotate([1., 0., 0.])
-            >>> print(v)
-            [ 0.0, 0.0, -1.0]
-        """
         q = Quat(self)
         q.normalize()
 
@@ -251,14 +183,7 @@ class Quat(numpy.ndarray):
         return matrix
 
     def getConjugate(self):
-        """Returns the conjugate of the quaternion.
-
-        Example:
-
-        >>> q = Quat(0.707,0.,0.,0.707)
-        >>> q.getConjugate()
-        [-0.707,0.,0.,0.707]
-        """
+      
         return Quat(-self.take(0),-self.take(1),-self.take(2),self.take(3))
 
     def getInverse(self):
@@ -284,16 +209,7 @@ class Quat(numpy.ndarray):
 
     @staticmethod
     def createFromAxisAngle(axis, angle):
-        """ Function createQuatFromAxis from quat expects two arguments. Quat has the Sofa format i.e (x,y,z,w).
-
-        Examples:
-
-        >>> q = Quat.createQuatFromAxis([1.,0.,0.],pi/2.)
-        >>> print(q)
-        [0.707,0.,0.,0.707]
-
-        Note that the angle should be in radian.
-        """
+      
         q = Quat()
         q[0]=axis[0]*math.sin(angle/2.)
         q[1]=axis[1]*math.sin(angle/2.)
@@ -306,25 +222,7 @@ class Quat(numpy.ndarray):
 
     @staticmethod
     def createFromEuler(a, axes='sxyz', inDegree=False):
-        """Returns a quaternion from Euler angles (in radian) and axis sequence.
-        The quaternion is of type Quat.
-
-        Args:
-
-        a is a list of three Euler angles [x,y,z]
-        axes : One of 24 axis sequences as string or encoded tuple
-
-        Example:
-
-        >>> q = Quat.createFromEuler([-pi, 0., 0.], 'sxyz')
-        >>> print(q)
-        [ 1.0 0.0  0.0  0.0]
-
-        >>> q = Quat.createFromEuler([-pi/2., pi/2., 0.], 'ryxz') #r stands for repetition
-        >>> print(q)
-        [ 0.5 -0.5  0.5  0.5]
-        """
-
+       
         if inDegree:
             a = [a[0]*pi/180, a[1]*pi/180, a[2]*pi/180]
 
@@ -376,15 +274,7 @@ class Quat(numpy.ndarray):
 
     @staticmethod
     def product(qa, qb):
-        """Use this product to compose the rotations represented by two quaterions.
-
-        Example:
-
-        >>> q1 = Quat()
-        >>> q2 = Quat()
-        >>> Quat.product(q1,q2)
-        [0.,0.,0.,1.]
-        """
+       
 
         # Here is a readable version :
         # array([ qa[3]*qb[0] + qb[3]*qa[0] + qa[1]*qb[2] - qa[2]*qb[1],

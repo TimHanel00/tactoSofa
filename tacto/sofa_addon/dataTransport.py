@@ -39,11 +39,9 @@ class TransportData:
                 self.sofaOjectDict[objectD.name].updateMesh(objectD.mesh)
                 return
         self.sofaOjectDict[objectD.name]=objectD
-        #print(self.sofaOjectDict)
     def getDict(self):
         return self.sofaOjectDict
     def get(self,name):
-        #print(self.sofaOjectDict.items())
         return self.sofaOjectDict[name]
     def tolist(self):
         return [v for k,v in self.sofaOjectDict.items()]  
@@ -94,7 +92,6 @@ class Sender(threading.Thread):
         ret=TransportData()
         for key,val in self.curData.getDict().items():
             ret.addObjectG(key,sofaObject(name=val.name,id=val.id,position=val.position,orientation=val.orientation,forces=val.forces,mesh=val.mesh))
-        #print(ret.sofaOjectDict)
         return ret
     def run(self):
         while self.running:

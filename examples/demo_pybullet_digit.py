@@ -30,7 +30,7 @@ def main(cfg):
     # Create and initialize DIGIT
 
     digit_body = px.Body(**cfg.digit)
-    digits.add_camera(digit_body.id, [-1])
+    digits.add_camera([-1],**cfg.digit)
 
     # Add object to pybullet and tacto simulator
     obj = px.Body(**cfg.object)

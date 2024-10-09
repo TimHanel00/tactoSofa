@@ -1,0 +1,20 @@
+[2024-09-25 11:37:21,172][__main__][INFO] - Initializing world
+[2024-09-25 11:37:21,354][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-09-25 21:32:05,608][__main__][INFO] - Initializing world
+[2024-09-25 21:32:05,747][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:13:24,336][__main__][INFO] - Initializing world
+[2024-10-08 22:13:24,524][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:14:14,774][__main__][INFO] - Initializing world
+[2024-10-08 22:14:14,937][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:14:52,200][__main__][INFO] - Initializing world
+[2024-10-08 22:14:52,384][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:15:28,325][__main__][INFO] - Initializing world
+[2024-10-08 22:15:28,479][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:16:42,485][__main__][INFO] - Initializing world
+[2024-10-08 22:16:42,656][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:17:29,324][__main__][INFO] - Initializing world
+[2024-10-08 22:17:29,458][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-08 22:17:50,139][__main__][INFO] - Initializing world
+[2024-10-08 22:17:50,306][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-10-09 11:29:02,308][__main__][INFO] - Initializing world
+[2024-10-09 11:29:02,485][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)

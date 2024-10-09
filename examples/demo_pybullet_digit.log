@@ -1,0 +1,4 @@
+[2024-09-25 11:37:40,336][__main__][INFO] - Initializing world
+[2024-09-25 11:37:40,488][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)
+[2024-09-25 11:47:29,896][__main__][INFO] - Initializing world
+[2024-09-25 11:47:30,046][pybulletX._wrapper][INFO] - Calling pybullet.setGravity(gravX=0, gravY=0, gravZ=-9.81, physicsClientId=0)

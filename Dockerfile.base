@@ -1,0 +1,95 @@
+# Use Ubuntu 22.04 as base image
+FROM nvidia/cuda:12.4.0-runtime-ubuntu22.04 AS base
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y \
+        libglib2.0-0 \
+        wget \
+        curl \
+        bzip2 \
+        ca-certificates \
+        libxext6 \
+        libsm6 \
+        libxrender1 \
+        git \
+        build-essential \
+        unzip
+
+RUN apt-get update && apt-get install -y mesa-utils
+RUN apt-get update && \
+    apt-get install libxi6 libxmu6 libnss3 libxcomposite-dev libxcursor-dev -y
+RUN apt-get update && \
+    apt-get install libxdamage-dev libxrandr-dev libxinerama-dev libx11-dev libxtst-dev libasound2 libdbus-1-3 libxcomposite1 libxft2 -y
+RUN apt-get update && apt-get install -y cmake build-essential
+RUN apt-get update && apt-get install -y libeigen3-dev
+RUN apt-get update && apt-get install freeglut3-dev -y
+RUN apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /miniconda.sh && \
+    bash /miniconda.sh -b -p /opt/conda && \
+    rm /miniconda.sh
+
+# Set path to conda
+ENV PATH="/opt/conda/bin:$PATH"
+
+# Create a conda environment with Python 3.8
+RUN conda create -n robot_learning python=3.8 -y
+
+# Activate the environment and install packages required for tacto
+RUN /opt/conda/bin/conda run -n robot_learning pip install numpy==1.18.5 && \
+    /opt/conda/bin/conda run -n robot_learning pip install pybullet==2.8.1 && \
+    /opt/conda/bin/conda run -n robot_learning pip install matplotlib==3.1.3 && \
+    /opt/conda/bin/conda run -n robot_learning pip install opencv-python==4.10.0.84 && \
+    /opt/conda/bin/conda run -n robot_learning pip install omegaconf>=2.0.6 && \
+    /opt/conda/bin/conda run -n robot_learning pip install pyrender==0.1.43 && \
+    /opt/conda/bin/conda run -n robot_learning pip install hydra-core>=1.0.6 && \
+    /opt/conda/bin/conda run -n robot_learning pip install urdfpy==0.0.22 && \
+    /opt/conda/bin/conda run -n robot_learning pip install scipy && \
+    /opt/conda/bin/conda run -n robot_learning pip install torch && \
+    /opt/conda/bin/conda run -n robot_learning pip install gym && \
+    /opt/conda/bin/conda run -n robot_learning pip install pybulletX==0.4.1 && \
+    /opt/conda/bin/conda run -n robot_learning pip install vtk && \
+    /opt/conda/bin/conda run -n robot_learning pip install pre-commit && \
+    /opt/conda/bin/conda run -n robot_learning pip install black && \
+    /opt/conda/bin/conda run -n robot_learning pip install flake8 && \
+    /opt/conda/bin/conda run -n robot_learning pip install flake8-copyright && \
+    /opt/conda/bin/conda run -n robot_learning pip install isort && \
+    /opt/conda/bin/conda run -n robot_learning pip install nox==2019.11.9 && \
+    /opt/conda/bin/conda run -n robot_learning pip install snakeviz==2.1.0 && \
+    /opt/conda/bin/conda run -n robot_learning pip install pytest==6.0.1 && \
+    /opt/conda/bin/conda run -n robot_learning pip install pytest-cov==2.10.1 && \
+    /opt/conda/bin/conda run -n robot_learning pip install pytest-benchmark==3.2.3 && \
+    /opt/conda/bin/conda run -n robot_learning pip install numpy-stl && \
+    /opt/conda/bin/conda run -n robot_learning pip install tetgen && \
+    /opt/conda/bin/conda install -n robot_learning -c conda-forge libstdcxx-ng
+# Copy the source code
+RUN useradd -m -s /bin/bash user
+WORKDIR /home/user
+COPY --chown=user:user . /home/user/
+
+# Install the package
+RUN /opt/conda/bin/conda run -n robot_learning pip install -e .
+
+# Apply necessary patches to the code
+RUN sed -i 's/fractions/math/g' /opt/conda/envs/robot_learning/lib/python3.8/site-packages/networkx/algorithms/dag.py
+RUN sed -i 's/np.int,/int,/g' /opt/conda/envs/robot_learning/lib/python3.8/site-packages/networkx/readwrite/graphml.py
+RUN sed -i 's/np.float,/float,/g' /opt/conda/envs/robot_learning/lib/python3.8/site-packages/urdfpy/urdf.py
+RUN sed -i 's/np.float)/float)/g' /opt/conda/envs/robot_learning/lib/python3.8/site-packages/urdfpy/urdf.py
+RUN sed -i 's/np.float)/float)/g' ./tacto/renderer.py
+
+# Install nonrigid dependencies
+WORKDIR /home/user/nonrigid
+RUN /opt/conda/bin/conda run -n robot_learning pip install -r requirements.txt
+RUN /opt/conda/bin/conda install -n robot_learning libboost -y
+
+# Download and install SOFA
+WORKDIR /home/user
+RUN wget -P /home/user/sofa https://github.com/sofa-framework/sofa/releases/download/v22.12.00/SOFA_v22.12.00_Linux.zip
+RUN unzip /home/user/sofa/SOFA_v22.12.00_Linux.zip -d /home/user/sofa
+RUN rm /home/user/sofa/SOFA_v22.12.00_Linux.zip
+RUN chmod +x /home/user/stlibInstall_docker.sh
+RUN /home/user/stlibInstall_docker.sh
+

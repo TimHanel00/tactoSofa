@@ -41,10 +41,10 @@ def createScene(root,dataSend,setupReceive):
     env=Environment(root)
     log.info("after env")
     material=Material(
-                                young_modulus = 200000.0,
-                                poisson_ratio = 0.47273863208820904,
+                                young_modulus = 1e5,
+                                poisson_ratio = 0.4,
                                 constitutive_model = ConstitutiveModel.COROTATED,
-                                mass_density = .2
+                                mass_density = 100.0
                             )
     
 
@@ -77,11 +77,12 @@ def createScene(root,dataSend,setupReceive):
     
     for obj in objectlist:
         tmpMeshes.append(obj.mesh)
-
+        print("OBJECT MESH")
+        print(obj.mesh)
         tissue = root.addObject(Tissue(
                                 root,
-                                simulation_mesh_filename="meshes/preop_volume.vtk",
-                                #simulation_mesh_filename=stl_to_tetrahedral_vtk(meshRootDir+obj.mesh,meshRootDir+"mesh_out.vtk"),#"meshes/preop_volume.vtk",
+                                #simulation_mesh_filename="meshes/preop_volume.vtk",
+                                simulation_mesh_filename=stl_to_tetrahedral_vtk(meshRootDir+obj.mesh,meshRootDir+obj.mesh+".vtk"),#"meshes/preop_volume.vtk",
                                 material= material,
                                 node_name="Tissue",
                                 tactoName=obj.name,
@@ -94,14 +95,17 @@ def createScene(root,dataSend,setupReceive):
                                 position=obj.position,
                                 orientation=obj.orientation,
                                 collision=True,
-                                contact_stiffness=1.0,
-                                massDensity=10.0,
+                                contact_stiffness=10.0,
+                                massDensity=material.mass_density,
                                 senderD=dataSend
                                 )
                             )
         tissueList.append(tissue)
     
-    tactoController=root.addObject(TactoController(name = sensorObj.name,sofaObjects=tissueList,meshfile=meshRootDir+sensorObj.mesh,senderD=dataSend,parent=root,solver=solver,stiffness=10.0,position=sensorObj.position,orientation=sensorObj.orientation,forceMode=ForceMode.dof,controllMode=ControllMode.position))
+    tactoController=root.addObject(TactoController(name = sensorObj.name,sofaObjects=tissueList,meshfile=meshRootDir+sensorObj.mesh,
+                                                   senderD=dataSend,parent=root,solver=solver,
+                                                   stiffness=0.01,position=sensorObj.position,orientation=sensorObj.orientation,
+                                                   forceMode=ForceMode.dof,controllMode=ControllMode.position))
     
     #print(type(tissue))
     #createCollisionMesh(root)
@@ -149,11 +153,14 @@ def init(digits):
     
 
     sofaProc=Process(target=sofaSimLoop,args=(IPC.getSofaConnects(),))#waitsForSetupbasedOn config files
+    sofaProc.start()
+    #tacto.sofa_addon.tactoEnvironment.tactoLaunch(IPC.getTactoConnects(),digits)
+    
     tactoProc=Process(target=tacto.sofa_addon.tactoEnvironment.tactoLaunch,args=(IPC.getTactoConnects(),digits,))#sendSetupAndStart
     
     
     tactoProc.start()
-    sofaProc.start()
+    
     
     tactoProc.join()
     sofaProc.join()

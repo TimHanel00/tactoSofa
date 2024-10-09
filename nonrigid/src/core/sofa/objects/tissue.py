@@ -14,6 +14,7 @@ from utils.sofautils import get_bbox, check_valid_displacement, get_distance_np
 from utils.vtkutils import has_tetra
 from core.log import Log
 import math
+import trimesh
 def read_mesh_file(location):
     location=os.path.join(os.getcwd(),location)
     """
@@ -113,6 +114,8 @@ class Tissue(Sofa.Core.Controller):
         self.stiffness=contact_stiffness
         self.dataSender=senderD
         self.solver=solver
+        self.init_pos=[]
+        self.init_angles=[]
         # Check on caribou
         if use_caribou:
             # TODO check if caribou libraries are there. If not, use default components setting use_caribou to false
@@ -151,6 +154,7 @@ class Tissue(Sofa.Core.Controller):
                 surface_mesh = simulation_mesh		
         
         # Topology
+        #self.node.addObject('DampingForceField',name='damping',template="Vec3d" ,dampingCoef="0.1")
         self.volume_topology = add_topology( parent_node=self.node,
                                             mesh_loader=topology_loader,
                                             topology=topology_type,
@@ -158,6 +162,7 @@ class Tissue(Sofa.Core.Controller):
                                             )
 
         # Mechanical object
+
         self.state = self.node.addObject('MechanicalObject', 
                                             src=self.volume_topology.getLinkPath(), 
                                             name=f"{node_name}_MechanicalObject_state", 
@@ -188,7 +193,7 @@ class Tissue(Sofa.Core.Controller):
             
 
         # Solver
-        self.node.addObject('EulerImplicitSolver', name="cg_odesolver")
+        self.node.addObject('EulerImplicitSolver', name="cg_odesolver",vdamping=20,rayleighStiffness=1)
         #self.node.addObject("CGLinearSolver", iterations=20, tolerance=1e-2,threshold=1e-2)
         if solver!=None:
             self.node.addObject(solver.objectName,iterations=solver.iterations, tolerance=solver.tolerance, threshold=solver.threshold)
@@ -249,19 +254,30 @@ class Tissue(Sofa.Core.Controller):
     #########################################################
     def onSimulationInitDoneEvent(self, __):
         self.previous_pos = np.asarray(self.state.rest_position.value)
+    def exportMesh(self):
+        triangles=self.node.Visual.VMapping.output.triangles.value
+        positions=self.node.Visual.VMapping.output.position.value
+        mesh=trimesh.Trimesh(vertices=positions, faces=triangles)
+        return mesh
     def getAngles(self):
         
         from splib3.numerics.quat import Quat
         eulerAngles= Quat(self.transformWrapper.getOrientation().tolist()).getEulerAngles()
         return [round(self.radTodeg(el),4) for el in eulerAngles]
     def onAnimateEndEvent(self, __):
+
         # Check for simulation instability at the end of each time step
         #print(f'pos: {self.transformWrapper.getPosition()}')
+
+
         pos=self.transformWrapper.getPosition()
-        angles=self.getAngles()
+        #angles=self.getAngles()
+
+        #print(pos)
         if self.dataSender is not None:
-            self.dataSender.update(self.tactoName,pos,angles)
-        
+                self.dataSender.update(name=self.tactoName,pos=[0,0,0],orientation=[0,0,0],mesh=self.exportMesh())
+            #self.dataSender.update(self.tactoName,pos,angles)
+
         return
         if(self.check_displacement):
             #print(type(self.state.position))

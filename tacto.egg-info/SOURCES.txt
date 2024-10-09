@@ -170,6 +170,7 @@ tacto/sofa_addon/__init__.py
 tacto/sofa_addon/dataTransport.py
 tacto/sofa_addon/sofaTactoLaunch.py
 tacto/sofa_addon/tactoEnvironment.py
+tacto/sofa_addon/utils.py
 tests/test_random_normal_generator.py
 tests/test_render_from_depth_osmesa.py
 tests/test_timeit.py

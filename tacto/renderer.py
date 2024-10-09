@@ -494,6 +494,7 @@ class Renderer:
         Currently linear adjustment from force to shift distance
         It can be replaced by non-linear adjustment with calibration from real sensor
         """
+        #print(normal_forces)
         existing_obj_names = list(self.current_object_nodes.keys())
         for obj_name in existing_obj_names:
             # Remove object from scene if not in contact
@@ -506,6 +507,7 @@ class Renderer:
             if obj_name not in object_poses:
                 continue
             obj_pos, objOri = object_poses[obj_name]
+            #print(obj_pos)
 
             # Add the object node to the scene
             if obj_name not in self.current_object_nodes:
@@ -526,7 +528,7 @@ class Renderer:
                 direction = camera_pos - obj_pos
                 direction = direction / (np.sum(direction ** 2) ** 0.5 + 1e-6)
                 obj_pos = obj_pos + offset * self.max_deformation * direction
-
+                
             self.update_object_pose(obj_name, obj_pos, objOri)
 
     def _post_process(self, color, depth, camera_index, noise=True, calibration=True):
@@ -553,7 +555,6 @@ class Renderer:
 
             # Set up corresponding lights (max: 8)
             self.update_light(self.cam_light_ids[i])
-
             # Adjust contact based on force
             if object_poses is not None and normal_forces is not None:
                 # Get camera pose for adjusting object pose
@@ -565,7 +566,6 @@ class Renderer:
                 self.adjust_with_force(
                     camera_pos, camera_ori, normal_forces, object_poses,
                 )
-
             color, depth = self.r.render(self.scene, flags=self.flags_render)
             color, depth = self._post_process(color, depth, i, noise, calibration)
 

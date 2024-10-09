@@ -1,0 +1,7 @@
+#!/bin/bash
+if [ "$#" -ne 1 ]; then
+    echo "Usage: sofaTacto <relative_path_to_python_file>"
+    exit 1
+fi
+docker build -f Dockerfile -t sofa_run_image .
+docker run --gpus all -it --rm     -e DISPLAY=$DISPLAY     -v /tmp/.X11-unix:/tmp/.X11-unix     -e NVIDIA_DRIVER_CAPABILITIES=all --user user --name tacto_sofa sofa_run_image "$1"

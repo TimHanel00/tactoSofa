@@ -50,7 +50,7 @@ class Environment():
         self.root.addObject('VisualStyle', displayFlags="showVisual showCollisionModels showForceFields")
         self.root.addObject('CollisionPipeline', verbose=0,draw=0,depth=2)
         self.root.addObject('BruteForceDetection', name="BruteForceBroadPhase")
-        self.root.addObject('NewProximityIntersection', name="Proximity",alarmDistance=0.01,contactDistance=0.001)
+        self.root.addObject('NewProximityIntersection', name="Proximity",alarmDistance=0.001,contactDistance=0.0005)
         #self.root.addObject('FreeMotionAnimationLoop')
         self.root.addObject('GenericConstraintSolver', name="GCS", maxIt=20, tolerance=1e-2, computeConstraintForces=True)
         self.root.addObject('DefaultContactManager', name='Response', response='PenalityContactForceField')
